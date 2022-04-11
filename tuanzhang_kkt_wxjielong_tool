@@ -1,21 +1,3 @@
-import pandas as pd
-import numpy as np
-import re
-import os
-import time
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import sys
-
-Auto_path = os.path.dirname(os.path.abspath(__file__))
-system_info = sys.platform
-if "win" in system_info:
-    rawdata_path = Auto_path.replace("coding","") + "\\rawdata\\"
-else:
-    rawdata_path = Auto_path.replace("coding","") + "/rawdata/"
-
-
 def jielong():
     # d = pd.read_excel("result.xlsx", header=1,sheet_name="dict")
     need = pd.read_excel("result.xlsx", header=0,index_col=0)
@@ -65,43 +47,56 @@ def jielong():
     df.to_excel("new_result.xlsx", sheet_name="done")
 
 
-def kkt(filename,email):
+def kkt(filename,email=""):
     df = pd.read_excel(rawdata_path + filename,header=0)
     df["楼栋"] = np.nan
     for index,row in df.iterrows():
         nums="[1234567890一二三四五六七八九]"
-        reg_str = "([1234567890一二三四五六七八九])\s*[-#号楼]+"
+        reg_str = "([1234567890一二三四五六七八九])\s*[-#/号楼樓]+"
+        reg_str1 = "([1234567890一二三四五六七八九])\s*号楼樓+"
         reg = re.findall(reg_str,row["楼栋门号"])
-        楼栋 = reg[0]
-        list_num_c = "一二三四五六七八九123456789"
-        for i in range(len(list_num_c)-9):
-            楼栋 = 楼栋.replace(list_num_c[i],list_num_c[i+9])
-        if reg:
-            df.loc[index,"楼栋"] =楼栋
-        reg_str2 = "[-#号楼](.*)"
+        reg1 = re.findall(reg_str1,row["楼栋门号"])
+        if reg1:
+            楼栋 = reg1[0]
+            list_num_c = "一二三四五六七八九123456789"
+            for i in range(len(list_num_c) - 9):
+                楼栋 = 楼栋.replace(list_num_c[i], list_num_c[i + 9])
+            if reg:
+                df.loc[index, "楼栋"] = 楼栋
+        elif reg:
+            楼栋 = reg[0]
+            list_num_c = "一二三四五六七八九123456789"
+            for i in range(len(list_num_c)-9):
+                楼栋 = 楼栋.replace(list_num_c[i],list_num_c[i+9])
+            if reg:
+                df.loc[index,"楼栋"] =楼栋
+        reg_str2 = "[-/#号楼](.*)室?"
         reg2 = re.findall(reg_str2, row["楼栋门号"])
-        单元 = reg2[0]
-        单元 = 单元.replace("室","").replace("楼","").replace(" ","")
-        if not 单元:
-            reg_str2 = "[-#号楼](\d{3,4})"
-            if isinstance(row["团员备注"],str):
-                reg2 = re.findall(reg_str2, row["团员备注"])
-                单元 = reg2[0]
         if reg2:
-            df.loc[index, "单元"] = 单元
-        reg_str3 = "(\d*)\d{2}"
-        reg3 = re.findall(reg_str3, 单元)
-        if reg3:
-            df.loc[index, "楼层"] = reg3[0]
+            单元 = reg2[0]
+            单元 = 单元.replace("室","").replace("楼","").replace(" ","")
+            reg_str2 = "([0-9A-Z]{3,5})"
+            reg2 = re.findall(reg_str2, 单元)
+            if reg2:
+                单元 = reg2[0]
+                if not 单元:
+                    reg_str2 = "[-#号楼樓](\d{3,4})"
+                    if isinstance(row["团员备注"],str):
+                        reg2 = re.findall(reg_str2, row["团员备注"])
+                        单元 = reg2[0]
+            if reg2:
+                df.loc[index, "单元"] = 单元
+            reg_str3 = "(\d*)\d{2}"
+            reg3 = re.findall(reg_str3, 单元)
+            if reg3:
+                df.loc[index, "楼层"] = reg3[0]
     df["楼层"] = df["楼层"].apply(lambda x: int(x) if isinstance(x,str) else x)
     df = df.sort_values(by=['楼栋','楼层'], ascending=(True,True))
     nowtime = time.strftime('%Y-%m-%d %H-%M-%S', time.localtime(time.time()))
     name = str(nowtime) +"订单.xlsx"
     df.to_excel(rawdata_path+name,index=False)
 
-
 if __name__ == '__main__':
-    # 快快团
-    kkt()
-    # 微信接龙统计
+    filename = "订单23_18_40.xlsx"
+    kkt(filename)
     jielong()
