@@ -6,10 +6,9 @@ def jielong():
     print(order_list)
     print(type(order_list))
     result = []
-    rest = []
     for order in order_list:
         nums = "[1234567890一二三四五六七八九]"
-        reg_str = "([1234567890一二三四五六七八九])\s*[-#/号楼]+"
+        reg_str = "([1234567890一二三四五六七八九])\s*[-#/–号一號楼]+"
         lou = ""
         sroom = ""
         room = ""
@@ -23,7 +22,6 @@ def jielong():
                     楼栋 = 楼栋.replace(list_num_c[i], list_num_c[i + 9])
                 if reg:
                     lou = 楼栋
-
             reg_str2 = "([0-9A-Z]{3,5})"
             reg2 = re.findall(reg_str2, order)
             if reg2:
@@ -31,10 +29,18 @@ def jielong():
                 单元 = 单元.replace("室", "").replace("楼", "").replace(" ", "")
                 if reg2:
                     room = 单元
-            reg_str_num = "\s(\d)份?"
+            reg_str_num = "[\s¥，](\d*)[份\s]?"
+            reg_str_num2 = "[\s¥，](\d*)份?"
             reg_num = re.findall(reg_str_num, order)
-            if reg_num:
-                num =reg_num[0]
+            reg_num2 = re.findall(reg_str_num2, order)
+            if reg_num and reg_num2:
+                num =reg_num[-1]
+                num2 = reg_num2[-1]
+                if num:
+                    num = num
+                elif num2:
+                    num = num2
+
             reg_str3 = "(\d*)\d{2}"
             reg3 = re.findall(reg_str3, room)
             sroom = ""
@@ -42,8 +48,6 @@ def jielong():
                 sroom = reg3[0]
             item = [order, lou, room, sroom,num]
             result.append(item)
-
-        print(lou)
     df = pd.DataFrame(result, columns=["order", "楼", "房价号", "楼层","数量"])
     df.to_excel("new_result.xlsx", sheet_name="done")
 
@@ -53,44 +57,54 @@ def kkt(filename,email=""):
     df["楼栋"] = np.nan
     for index,row in df.iterrows():
         nums="[1234567890一二三四五六七八九]"
-        reg_str = "([1234567890一二三四五六七八九])\s*[-#/号楼樓]+"
-        reg_str1 = "([1234567890一二三四五六七八九])\s*号楼樓+"
-        reg = re.findall(reg_str,row["楼栋门号"])
-        reg1 = re.findall(reg_str1,row["楼栋门号"])
-        if reg1:
-            楼栋 = reg1[0]
-            list_num_c = "一二三四五六七八九123456789"
-            for i in range(len(list_num_c) - 9):
-                楼栋 = 楼栋.replace(list_num_c[i], list_num_c[i + 9])
-            if reg:
-                df.loc[index, "楼栋"] = 楼栋
-        elif reg:
-            楼栋 = reg[0]
-            list_num_c = "一二三四五六七八九123456789"
-            for i in range(len(list_num_c)-9):
-                楼栋 = 楼栋.replace(list_num_c[i],list_num_c[i+9])
-            if reg:
-                df.loc[index,"楼栋"] =楼栋
-        reg_str2 = "[-/#号楼](.*)室?"
-        reg2 = re.findall(reg_str2, row["楼栋门号"])
-        if reg2:
-            单元 = reg2[0]
-            单元 = 单元.replace("室","").replace("楼","").replace(" ","")
-            reg_str2 = "([0-9A-Z]{3,5})"
-            reg2 = re.findall(reg_str2, 单元)
+        reg_str = "[^\d]([1234567890一二三四五六七八九])\s*[-#/号栋楼樓]+"
+        reg_str1 = "[^\d]([1234567890一二三四五六七八九])\s*号栋楼樓+"
+        if isinstance(row[lie_name],str):
+            reg = re.findall(reg_str,row[lie_name])
+            reg1 = re.findall(reg_str1,row[lie_name])
+            if reg1:
+                楼栋 = reg1[0]
+                list_num_c = "一二三四五六七八九123456789"
+                for i in range(len(list_num_c) - 9):
+                    楼栋 = 楼栋.replace(list_num_c[i], list_num_c[i + 9])
+                if reg:
+                    df.loc[index, "楼栋"] = 楼栋
+            elif reg:
+                楼栋 = reg[0]
+                list_num_c = "一二三四五六七八九123456789"
+                for i in range(len(list_num_c)-9):
+                    楼栋 = 楼栋.replace(list_num_c[i],list_num_c[i+9])
+                if reg:
+                    df.loc[index,"楼栋"] = 楼栋
+            reg_str2 ="[-/#号楼栋]\n?(.+)[室房]?"
+            reg2 = re.findall(reg_str2, row[lie_name])
+            reg_str22 = "[-/#号楼栋]\n?([\dA-Z]+)[室房]?"
+            reg22 = re.findall(reg_str22, row[lie_name])
             if reg2:
                 单元 = reg2[0]
-                if not 单元:
-                    reg_str2 = "[-#号楼樓](\d{3,4})"
-                    if isinstance(row["团员备注"],str):
-                        reg2 = re.findall(reg_str2, row["团员备注"])
-                        单元 = reg2[0]
-            if reg2:
-                df.loc[index, "单元"] = 单元
-            reg_str3 = "(\d*)\d{2}"
-            reg3 = re.findall(reg_str3, 单元)
-            if reg3:
-                df.loc[index, "楼层"] = reg3[0]
+                单元 = 单元.replace("室","").replace("楼","").replace(" ","").replace("房","")
+                reg_str2 = "([0-9A-Z]{3,5})"
+                reg2 = re.findall(reg_str2, 单元)
+                if reg2:
+                    单元 = reg2[0]
+                    if not 单元:
+                        reg_str2 = "[-#号楼樓](\d{3,4})"
+                        if "团员备注" in df.columns:
+                            if isinstance(row["团员备注"],str):
+                                reg2 = re.findall(reg_str2, row["团员备注"])
+                                单元 = reg2[0]
+                if reg2:
+                    df.loc[index, "单元"] = 单元
+                elif reg22:
+                    单元 = reg22[0]
+                    df.loc[index, "单元"] = 单元
+                if len(单元)==5:
+                    reg_str3 = "(\d*)\d{3}"
+                else:
+                    reg_str3 = "(\d*)\d{2}"
+                reg3 = re.findall(reg_str3, 单元)
+                if reg3:
+                    df.loc[index, "楼层"] = reg3[0]
     df["楼层"] = df["楼层"].apply(lambda x: int(x) if isinstance(x,str) else x)
     df = df.sort_values(by=['楼栋','楼层'], ascending=(True,True))
     nowtime = time.strftime('%Y-%m-%d %H-%M-%S', time.localtime(time.time()))
