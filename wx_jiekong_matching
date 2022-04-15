@@ -1,0 +1,508 @@
+# -*- coding: utf-8 -*-
+import re
+import pandas as pd
+import traceback
+import sys
+# order_df = pd.read_excel(r"C:\Users\vivie\OneDrive\Desktop\fsdownload\2022-04-13 20-19-41_timeid-819-1649852381_wx分析文件.xlsx",header=0)
+# order_df["number", "content"] = order_df['order'].str.split(pat='.', expand=True)
+# order_list = order_df["content"].unique().tolist()
+# print(order_list)
+# for order in order_list:
+#     if "-" in order:
+#         lou = order.split("-")
+compare_list = ["號樓","号楼  ","号楼 ","号楼","号","栋","building","#","-","–","−","－","_","/",".","—","，","~","～"]
+jieci_list = ["份","盒","桶","箱", "套","袋","斤", "个"]
+system_info = sys.platform
+
+
+# 中文-
+def get_info(a, debug):
+    if "win" in system_info:
+        print(a, debug)
+    if debug == True:
+        a = "1. 2303 玉米蔬菜 2份 大白菜水饺 1份" # ok
+    first = a.split(".")[0]
+    n = first+"."+" "
+    if "win" in system_info:
+        print(62, n, first, type(first))
+    # n需要确认是否室存数字
+    # status = is_all_number(n)
+    first = first.strip()
+    status = first.isdigit()
+    if "win" in system_info:
+        print(status)
+    if status:
+        try:
+            lou, special, room, louceng, mobile_number = matching(n, a)
+        except Exception as e:
+            print("72e",e)
+            traceback.print_exc()
+            lou =""
+            special =""
+            room =""
+            louceng = ""
+            mobile_number =""
+    else:
+        lou =""
+        special =""
+        room =""
+        louceng = ""
+        mobile_number =""
+    if "win" in system_info:
+        print(83,"room",room)
+    if room.isdigit():
+        try:
+            if len(mobile_number)>0:
+                a1 = a.replace(mobile_number,"")
+            else:
+                a1 = a
+            fenshu_other = a1.split(room)[1]
+            if "win" in system_info:
+                print(90,fenshu_other)
+            detail, shuliang, detail1, shuliang1 = get_shuliang(fenshu_other)
+        except Exception as e:
+            if "win" in system_info:
+                print("94e",e)
+            traceback.print_exc()
+            detail = ""
+            shuliang = ""
+            detail1 = ""
+            shuliang1 = ""
+    else:
+        # if len(room) > 0:
+        #     fenshu_other = room
+        #     room = ""
+        # else:
+        fenshu_other = a.replace(mobile_number, "", 1, ).replace(n,"",1).replace(lou, "", 1, ).replace(special, "", 1, )
+        room = ""
+        try:
+            if "win" in system_info:
+                print(104)
+            detail, shuliang, detail1, shuliang1 = get_shuliang(fenshu_other)
+        except Exception as e:
+            print("94e",e)
+            traceback.print_exc()
+            detail = ""
+            shuliang = ""
+            detail1 = ""
+            shuliang1 = ""
+    if "win" in system_info:
+        print(115,lou)
+    lou = drop_special_character(lou)
+    if "win" in system_info:
+        print(lou)
+    item = [a, lou, special, room, louceng, detail, shuliang, detail1, shuliang1, mobile_number]
+    if "win" in system_info:
+        print(item)
+    return item
+
+
+def matching(n, a):
+    other = a.replace(n,"")
+    # print("107other",other)
+    if "弄" in other:
+        other = other.split("弄")[1]
+    elif "村" in other:
+        other = other.split("村")[1]
+    mobile_number = mobile(other)
+    if len(mobile_number) > 0:
+        other = other.replace(mobile_number,"")
+    else:
+        mobile_number = ""
+    compare_status = False
+    for compare in compare_list:
+        if compare in other:
+            if "win" in system_info:
+                print(118,"compare",compare)
+            compare_status = True
+            # 提取数字部分 todo
+            # lou = get_last_number(lou)
+            room_other = other.split(compare)[-1]
+            if "win" in system_info:
+                print("room_other",room_other)
+            room_other = compare + room_other
+            room_other = check_room_other(room_other,other, compare)
+            if "win" in system_info:
+                print("room_other",room_other)
+            lou = other.replace(room_other,"", 1)
+            if "win" in system_info:
+                print("128lou",lou)
+            lou = clean_lou(lou, compare)
+            # 判断楼是否在新的位置如果是要用楼获得room_other
+            lou, room_other = check_lou_position(lou,room_other,other)
+            if "win" in system_info:
+                print("y",lou,"room", room_other)
+            # status = is_all_number(n)
+            # 检查楼是否是数字
+            if "单元" in room_other:
+                room = get_room(room_other, other)
+                special = room_other.split(room)[0]
+                special, key = replace_file(special)
+            else:
+                room = get_room(room_other, other)
+                special = ""
+            # 检查是否室数字加英文
+            break
+        # else:
+        #     lou = ""
+        #     special = ""
+        #     room = get_first_number(other)
+    if compare_status == False:
+        if " " in other:
+            if "win" in system_info:
+                print("171空格", other)
+            lou = other.split(" ")[0]
+            if "win" in system_info:
+                print("172lou",lou)
+            result = lou.isdigit()
+            if result:
+                room = other.split(" ")[1]
+                special = ""
+            else:
+                lou = other.split(" ")[1]
+                result = lou.isdigit()
+                if result:
+                    room = other.split(" ")[2]
+                    special = ""
+                else:
+                    lou = other.split(" ")[2]
+                    result = lou.isdigit()
+                    if result:
+                        room = other.split(" ")[3]
+                        special = ""
+                    else:
+                        lou = ""
+                        room = get_first_number(other)
+                        special = ""
+    louceng = get_louceng(room)
+    return lou, special, room, louceng, mobile_number
+
+
+def get_louceng(part):
+    if len(part) == 5:
+        reg_str3 = "(\d*)\d{3}"
+    else:
+        reg_str3 = "(\d*)\d{2}"
+    reg3 = re.findall(reg_str3, part)
+    if reg3:
+        return reg3[0]
+    return ""
+
+
+def clean_lou(lou, compare):
+    # todo 增加 判断compare出现几次.candy
+    if "win" in system_info:
+        print("177lou",lou)
+    if "-" in lou:
+        try:
+            lou = lou.split(" ")[-1]
+        except:
+            pass
+    else:
+        lou, key = replace_file(lou)
+        lou = get_first_number(lou)
+    if "win" in system_info:
+        print("final lou",lou)
+    return lou
+
+
+def check_lou_position(lou,room_other, other):
+    if "win" in system_info:
+        print(room_other)
+    x = get_first_number(room_other)
+    if len(x)>1:
+        pass
+    else:
+        room_other = other.split(lou)[1]
+    if "win" in system_info:
+        print(194,room_other)
+    # input("stop")
+    return lou, room_other
+
+
+def get_room(room_other, other):
+    if "win" in system_info:
+        print(127,room_other)
+    room = room_other.split(" ")[0]
+    if "win" in system_info:
+        print(room)
+    status = room.isdigit()
+    contain_status = is_contains_number(room)
+    if status:
+        pass
+    elif contain_status:
+        if "申银" in other or "武定路327号" in other:
+            room_r = get_first_number_english(room)
+        else:
+            if "win" in system_info:
+                print(248, room)  # 248 号楼2903C candy如果数字后面跟的是一个字母就把room变成2903c
+            room_r = get_first_number(room)
+        if len(room_r) == 1:
+            new_room = room.replace(room_r,"",1)
+            if "申银" in other or "武定路327号" in other:
+                room = get_first_number_english(new_room)
+            else:
+                room = get_first_number(new_room)
+        else:
+            room = room_r
+
+        if "win" in system_info:
+            print(212,room)
+    else:
+        room = room_other.split(" ")[1]
+        if "申银" in other or "武定路327号" in other:
+            room = get_first_number_english(room)
+        else:
+            room = get_first_number(room)
+            if len(room)==0:
+                room = get_first_number(room_other)
+    if "win" in system_info:
+        print(143, room)
+    return room
+
+
+def check_room_other(room_other,other, compare):
+    if "win" in system_info:
+        print(225,"room_other", room_other, compare, other)
+    for x in jieci_list:
+        room_first = other.replace(room_other,"")
+        # print("room_first",room_first)
+        if x in room_first:
+            # print(x)
+            a = other.split(compare)[0]
+            room_other = other.replace(a,"")
+            break
+    if "win" in system_info:
+        print(232,room_other)
+    first_number = get_first_number(room_other)
+    if "win" in system_info:
+        print("frist_number",first_number)
+    # 有可能没有数字或者只有数字  a = " 61. 20-1203-2"
+    status = False
+    if first_number and len(first_number) > 1:
+        status = True
+        if "win" in system_info:
+            print("不改,用最后一个标志符号")
+    else:
+        for jc in jieci_list:
+            if jc in room_other or len(first_number)==1:
+                status = True
+                x = other.split(compare)[0]
+                print("119",x)
+                room_other = other.replace(x,"", 1)
+                break
+
+    if status:
+        pass
+    else:
+        x = other.split(compare)[0]
+        if "win" in system_info:
+            print("137",x)
+        room_other = other.replace(x,"", 1)
+    if "win" in system_info:
+        print("167return",room_other)
+    return room_other
+
+
+def get_shuliang(content1):
+    # content = "蔬菜🥬一份"
+    # content = "静安面包团长 200"
+
+    if "/" in content1:
+        a = content1.split("/")[0]
+        b = content1.split("/")[1]
+        detail, shuliang, status, key = shuliang_divid(a)
+        detail1, shuliang1, status, key = shuliang_divid(b,2)
+        if "win" in system_info:
+            print("b",b)
+    else:
+        if "win" in system_info:
+            print("content1",content1)
+        detail, shuliang, status, key = shuliang_divid(content1)
+        if status:
+            rest = content1.replace(detail,"",1).replace(shuliang,"",1)
+        else:
+            rest = content1.replace(detail,"",1).replace(key,"",1)
+        if "win" in system_info:
+            print(316,rest,len(rest))
+        if len(rest) > 2:
+            if "win" in system_info:
+                print(331)
+            detail1, shuliang1, status, key = shuliang_divid(rest,2)
+            if "win" in system_info:
+                print(336,detail1)
+        else:
+            detail1 = ""
+            shuliang1 =""
+        if "win" in system_info:
+            print(detail, shuliang, detail1, shuliang1)
+    return detail, shuliang, detail1,shuliang1
+
+
+def shuliang_divid(content1,num = ""):
+    content, key = replace_file(content1)
+    if "win" in system_info:
+        print(317,content, key)
+    status = False
+    if content == content1:
+        status = True
+        if "win" in system_info:
+            print(content)
+        shuliang = get_first_number(content)
+        if "win" in system_info:
+            print(214,shuliang)
+        detail = content.split(shuliang)[0]
+        detail = detail.replace("室","")
+        if "win" in system_info:
+            print(shuliang, detail)
+        key = ""
+    else:
+        if "win" in system_info:
+            print("key",key)
+        detail = content1.split(key)[0]
+        shuliang = content1.split(key)[1]
+        shuliang, key1 = replace_file(key)
+    if num == 2:
+        for x in jieci_list:
+            detail = detail.replace(x,"")
+    return detail, shuliang, status, key
+
+
+def replace_file(content):
+    dic1 = {"一":"1","壹":"1","Ⅰ":"1","二":"2","两":"2","贰":"2","Ⅱ":"2","三":"3","叁":"3","Ⅲ":"3","四":"4","肆":"4","Ⅳ":"4","五":"5","伍":"5","Ⅴ":"5","六":"6","陆":"6","Ⅵ":"6","七":"7","柒":"7","Ⅶ":"7","八":"8","捌":"8","Ⅷ":"8","九":"9","玖":"9","Ⅸ":"9","十":"10","拾":"10","Ⅹ":"10","百":"100","佰":"100","千":"1000","仟":"1000"}  # todo
+    status = False
+    for key, value in dic1.items():
+        # print(key,value)
+        if key in content:
+            if "win" in system_info:
+                print(key)
+            status = True
+            content = content.replace(key, value)
+            if "win" in system_info:
+                print(content)
+            break
+    if status:
+        pass
+    else:
+        key = ""
+    return content, key
+
+
+#检验是否全是中文字符
+def is_all_chinese(strs):
+    for _char in strs:
+        if not '\u4e00' <= _char <= '\u9fa5':
+            return False
+    return True
+
+#---------------------------------------------------------------------------------------
+
+#检验是否包含中文字符
+def is_contains_chinese(strs):
+    for _char in strs:
+        if '\u4e00' <= _char <= '\u9fa5':
+            return True
+    return False
+
+#检验是否包含数字
+def is_contains_number(strs):
+    # str = '号'
+    pattern = re.compile('[0-9]+')
+    match = pattern.findall(strs)
+    if match:
+        print ('contains digital')
+        return True
+    else:
+        print ('not contains digital')
+        return False
+
+
+def get_first_number_english(code):
+    # code ='"msg"222333eff:"查询成333功!","v_code":"175177","errCode":0,"v_type":"sld"'
+    need = ".*?([0-9]+[a-zA-Z]+).*"
+    match_obj = re.match(need,code)
+    if match_obj:
+        xx = match_obj.group(1)
+        print(xx)
+    else:
+        xx = ""
+    return xx
+
+
+def get_first_number(code):
+    xx = ""
+    # code = "号 1703 一份"
+    # code ='"msg"222333e:"查询成333功!","v_code":"175177","errCode":0,"v_type":"sld"'
+    # print(type(code))
+    need = ".*?([0-9]+).*"
+    match_obj = re.match(need,code)
+    if match_obj:
+        xx = match_obj.group(1)
+    print("get_first_number",xx)
+    return xx
+
+
+def drop_special_character(code):
+    # code = '北区-533-2-eee'
+    # need = ".*?([0-9]+[a-zA-Z]+).*"
+    xx = ""
+    need = "\d.*"
+    match_obj = re.search(need,code)
+    if match_obj:
+        xx = match_obj.group()
+        print(308,xx)
+    return xx
+
+
+def get_last_number(code):
+    # code ='"msg"222:"查询成333功!","v_code":"175177","errCode":0333,"v_type":"sld"'
+    xx = ""
+    # print(type(code))
+    need = "([0-9]+)"
+    match_obj = re.findall(need,code)
+    if match_obj:
+        xx = match_obj[-1]
+        print(xx)
+    return xx
+
+
+def mobile(line):
+    # line="3errr18902144452fff"
+    regex_str="(1[34578]\\d{9})"
+    match_obj = re.findall(regex_str,line)
+    match_obj = "".join(match_obj)
+    print(match_obj)
+    return match_obj
+
+
+def drop_chinese(code):
+    code = '北区-5'
+    match_obj = re.sub('[\u4e00-\u9fa5]', '', code)
+    print(match_obj)
+
+
+def exceution():
+    a_list =[" 9. 2号楼2单元703 菜一份"," 6. 2一丨一403 菜一份"," 12. 2－2－803 菜 一份"," 7. 谢 27号102室","上海市静安区申银发展大厦1栋1304房E房", "6. 8−301 349一套 315一套"," 20. 水晶溪珍 780-1201-3套","15. 760#309 2套", "2. 98-201 蔬菜一份", " 11. 10号403  一份", "1. 4-301", " 10. 760-710室 小杨  二套", " 8. 760#1106yan 1套", "8. 69–402室  蔬菜🥬一份", " 15. 沈伟伟 92-402 蔬菜一份", "上海市上海市普陀区同普路1441弄1号301室", " 6. 北区1号505", " 10. 北区-5-1702 1份2瓶", "14. 3号1902静安面包团长 200", " 10. 760-710室 小杨  二套"]
+    result = []
+    debug = False
+    for a in a_list:
+        item = get_info(a, debug)
+        result.append(item)
+    df = pd.DataFrame(result)
+    df.to_excel("df.xlsx")
+    print(df)
+
+
+if __name__ == '__main__':
+    code="158套餐1份"
+    # status = is_contains_number(strs)
+    # print("status",status)
+    # check()
+    # mobile()
+    get_info(code,True)
+    # get_last_number(code)
+    # get_shuliang(code)
+    # exceution()
+    # get_last_number(code)
+    # get_first_number(code)
+    # is_contains_number(code)
